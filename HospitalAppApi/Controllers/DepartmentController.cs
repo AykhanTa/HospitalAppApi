@@ -78,6 +78,7 @@ namespace HospitalAppApi.Controllers
             }
             existDepartment.Name=departmentUpdateDto.Name;
             existDepartment.Limit=departmentUpdateDto.Limit;
+            existDepartment.UpdateDate=DateTime.Now;
             await _context.SaveChangesAsync();
             return StatusCode(204);
 
