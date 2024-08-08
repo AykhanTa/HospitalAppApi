@@ -22,15 +22,22 @@ namespace HospitalAppApi.Controllers
         }
 
         [HttpGet("")]
-        public async Task<IActionResult> Get()
+        public async Task<IActionResult> Get(int page=1,string search=null)
         {
-            var doctors=await _appContext.Doctors.AsNoTracking().Include(d=>d.Department).ToListAsync();
-            List<DoctorReturnDto> list = new();
-            foreach (var doctor in doctors)
-            {
-                list.Add(_mapper.Map<DoctorReturnDto>(doctor));
-            }
-            return Ok(list);
+            var query = _appContext.Doctors.AsQueryable();
+            if (search!=null)
+                query=query.Where(d=>d.Name.ToLower().Contains(search.ToLower()));
+            var datas = await query
+                .Skip((page - 1) * 3)
+                .Take(3)
+                .Include(d=>d.Department)
+                .ToListAsync();
+            var totalCount=await query.CountAsync();
+            DoctorListDto doctorListDto = new();
+            doctorListDto.Doctors = _mapper.Map<List<DoctorReturnDto>>(datas);
+            doctorListDto.CurrentPage= page;
+            doctorListDto.TotalCount = totalCount;
+            return Ok(doctorListDto);
         }
         [HttpGet("{id}")]
         public async Task<IActionResult> Get(int id)
@@ -45,12 +52,13 @@ namespace HospitalAppApi.Controllers
         [HttpPost("")]
         public async Task<IActionResult> Create(DoctorCreateDto doctorCreateDto)
         {
-            if (!await _appContext.Departments.AnyAsync(d => d.Id == doctorCreateDto.DepartmentId))
+            var existDepart = await _appContext.Departments.Include("Doctors").FirstOrDefaultAsync(d => d.Id == doctorCreateDto.DepartmentId);
+            if (existDepart==null)
                 return BadRequest("Department is not found...");
-            Doctor doctor = new();
-            doctor.Name=doctorCreateDto.Name;
-            doctor.Experience=doctorCreateDto.Experience;
-            doctor.DepartmentId=doctorCreateDto.DepartmentId;
+            if (existDepart.Doctors.Count() >= existDepart.Limit)
+                return Conflict("Group limit reached..");
+
+            Doctor doctor = _mapper.Map<Doctor>(doctorCreateDto);
             doctor.CreateDate = DateTime.Now;
             await _appContext.Doctors.AddAsync(doctor);
             await _appContext.SaveChangesAsync();
@@ -66,11 +74,25 @@ namespace HospitalAppApi.Controllers
             return NoContent();
 
         }
-        //[HttpPut("{id}")]
-        //public IActionResult Update(int id)
-        //{
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id,DoctorUpdateDto doctorUpdateDto)
+        {
+            var existDoctor = await _appContext.Doctors.Include(d=>d.Department).FirstOrDefaultAsync(d => d.Id == id);
+            if(existDoctor is null) return NotFound();
+            if (existDoctor.DepartmentId != doctorUpdateDto.DepartmentId)
+            {
+                var existDep = await _appContext.Departments.Include(d => d.Doctors).FirstOrDefaultAsync(d => d.Id == doctorUpdateDto.DepartmentId);
+                if (existDep is null) 
+                    return NotFound("Group not found");
 
-        //}
+                if (existDep.Doctors.Count() >= existDep.Limit)
+                    return Conflict("Group limit reached..");
+            }
+            _mapper.Map(doctorUpdateDto,existDoctor);
+            existDoctor.UpdateDate=DateTime.Now;
+            await _appContext.SaveChangesAsync();
+            return NoContent();
+        }
 
     }
 }

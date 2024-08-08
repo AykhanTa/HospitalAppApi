@@ -27,6 +27,9 @@ namespace HospitalAppApi.Profiles
 
             //doctor
             CreateMap<Doctor, DoctorReturnDto>();
+            CreateMap<DoctorCreateDto, Doctor>();
+            CreateMap<DoctorUpdateDto, Doctor>();
+            CreateMap<Department, DepartmentInDoctorReturnDto>();
 
         }
     }
