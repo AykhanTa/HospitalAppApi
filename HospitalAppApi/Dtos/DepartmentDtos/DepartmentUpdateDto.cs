@@ -1,0 +1,41 @@
+﻿using FluentValidation;
+
+namespace HospitalAppApi.Dtos.DepartmentDtos
+{
+    public class DepartmentUpdateDto
+    {
+        public string Name { get; set; }
+        public int Limit { get; set; }
+        public IFormFile File { get; set; }
+    }
+    public class DepartmentUpdateDtoValidator : AbstractValidator<DepartmentUpdateDto>
+    {
+        public DepartmentUpdateDtoValidator() 
+        {
+            RuleFor(d => d.Name)
+                .MaximumLength(20)
+                .MinimumLength(5)
+                .NotEmpty();
+            RuleFor(d => d.Limit)
+                .InclusiveBetween(1, 10)
+                .NotEmpty();
+            RuleFor(d => d)
+                .Custom((d, context) =>
+                {
+                    if (d.File == null)
+                    {
+                        context.AddFailure("File", "file can not be empty..");
+                        return;
+                    }
+                    if (d.File.Length / 1024 > 300)
+                    {
+                        context.AddFailure("File", "size is too large");
+                    }
+                    if (!d.File.ContentType.Contains("image/"))
+                    {
+                        context.AddFailure("File", "file only imagee");
+                    }
+                });
+        }
+    }
+}
